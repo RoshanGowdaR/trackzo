@@ -60,6 +60,7 @@ export default function SettingsPage() {
                 <span className="text-white font-medium">{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
               </div>
               <button
+                suppressHydrationWarning
                 onClick={() => setDarkMode(!darkMode)}
                 className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 transition-colors"
               >
@@ -79,6 +80,7 @@ export default function SettingsPage() {
           <h2 className="text-2xl font-bold text-white mb-6">Backup & Restore</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <motion.button
+              suppressHydrationWarning
               whileHover={{ scale: 1.02 }}
               className="flex items-center justify-center gap-2 p-4 bg-secondary-800/50 hover:bg-secondary-700/50 rounded-lg transition-colors"
             >
@@ -86,6 +88,7 @@ export default function SettingsPage() {
               <span className="text-white font-semibold">Backup Database</span>
             </motion.button>
             <motion.button
+              suppressHydrationWarning
               whileHover={{ scale: 1.02 }}
               className="flex items-center justify-center gap-2 p-4 bg-secondary-800/50 hover:bg-secondary-700/50 rounded-lg transition-colors"
             >
@@ -97,6 +100,7 @@ export default function SettingsPage() {
 
         {/* Save Button */}
         <motion.button
+          suppressHydrationWarning
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="w-full btn-primary flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"

@@ -174,6 +174,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </div>
               </div>
               <motion.button
+                suppressHydrationWarning
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleLogout}
@@ -203,6 +204,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div className="flex items-center justify-between p-4 md:p-6">
             <motion.button
+              suppressHydrationWarning
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -215,6 +217,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             <div className="flex items-center gap-4">
               <motion.button
+                suppressHydrationWarning
                 whileHover={{ scale: 1.1 }}
                 className="relative p-2 hover:bg-secondary-800/50 rounded-lg text-secondary-300 hover:text-white transition-all"
               >
@@ -223,11 +226,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </motion.button>
 
               <motion.button
+                suppressHydrationWarning
                 whileHover={{ scale: 1.1 }}
                 onClick={handleLogout}
                 className="p-2 hover:bg-secondary-800/50 rounded-lg text-secondary-300 hover:text-white transition-all"
               >
-                <LogOut className="w-6 h-6" />
+                <LogOut className="w-4 h-4" />
               </motion.button>
             </div>
           </div>
