@@ -22,6 +22,10 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+*.db
+*.sqlite
+*.sqlite3
+build_*.txt
 
 # Logs
 npm-debug.log*
