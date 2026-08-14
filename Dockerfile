@@ -1,36 +1,35 @@
-# Build stage
-FROM node:18-alpine AS builder
-
+# Stage 1: Install dependencies
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source code
+# Stage 2: Build the Next.js application
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the application
+# Build Next.js production bundle
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
-
+# Stage 3: Production image
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production
+ENV NODE_ENV=production
 
-# Copy built application from builder
+# Copy only what's needed for production
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
+COPY --from=builder /app/next.config.mjs ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/server.js ./
+COPY --from=builder /app/php-version ./php-version
+COPY --from=builder /app/start.js ./
 
-# Expose port
-EXPOSE 3000
+EXPOSE 10000
 
-# Start application
-CMD ["npm", "start"]
+CMD ["node", "start.js"]

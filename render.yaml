@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: buildflow-erp
+    runtime: docker
+    repo: https://github.com/RoshanGowdaR/trackzo.git
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
