@@ -695,8 +695,8 @@ export default function ProjectDashboardPage() {
 
   const expenseChartOptions = {
     chart: { type: 'donut' as const, width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false } },
-    colors: ['#10B981', '#EF4444', '#F59E0B'],
-    labels: ['Remaining Budget', 'Expenses', 'Reserved'],
+    colors: ['#10B981', '#EF4444'],
+    labels: ['Remaining Budget', 'Expenses'],
     tooltip: { theme: 'dark' as const },
     legend: { position: 'bottom' as const },
   }
@@ -1035,7 +1035,7 @@ export default function ProjectDashboardPage() {
                 {mounted && (
                   <SafeChart
                     options={expenseChartOptions}
-                    series={(remainingBudget + project.expenses > 0) ? [remainingBudget, project.expenses, 0] : [100, 0, 0]}
+                    series={[Math.max(1, remainingBudget), Math.max(1, project.expenses)]}
                     type="donut"
                     height={280}
                   />
