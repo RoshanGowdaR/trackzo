@@ -1,10 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+import SafeChart from '@/components/SafeChart'
 
 interface Filters {
   dateRange: { start: string; end: string }
@@ -17,9 +15,20 @@ interface Filters {
 }
 
 export default function ReportOverview({ filters }: { filters: Filters }) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!mounted) {
+    return <div className="h-80 bg-secondary-800/20 rounded-2xl animate-pulse" />
+  }
+
   // Chart Options
-  const budgetVsExpenseOptions = {
-    chart: { type: 'bar' as const, toolbar: { show: true } },
+  const budgetVsExpenseOptions: any = {
+    chart: { type: 'bar' as const, width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: true } },
     colors: ['#2563EB', '#06B6D4'],
     xaxis: { categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'] },
     plotOptions: { bar: { columnWidth: '55%' } },
@@ -28,9 +37,12 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
     legend: { position: 'top' as const },
   }
 
-  const budgetVsExpenseSeries = []
+  const budgetVsExpenseSeries = [
+    { name: 'Budget', data: [50000, 60000, 75000, 90000, 110000] },
+    { name: 'Expense', data: [42000, 51000, 68000, 82000, 95000] },
+  ]
 
-  const monthlyExpenseOptions = {
+  const monthlyExpenseOptions: any = {
     chart: { type: 'line' as const, toolbar: { show: true } },
     colors: ['#F59E0B'],
     xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'] },
@@ -39,9 +51,11 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
     tooltip: { theme: 'dark' as const },
   }
 
-  const monthlyExpenseSeries = []
+  const monthlyExpenseSeries = [
+    { name: 'Expenses', data: [25000, 32000, 45000, 38000, 52000, 48000, 61000] },
+  ]
 
-  const cashFlowOptions = {
+  const cashFlowOptions: any = {
     chart: { type: 'area' as const, toolbar: { show: true } },
     colors: ['#22C55E'],
     xaxis: { categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4'] },
@@ -50,16 +64,18 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
     tooltip: { theme: 'dark' as const },
   }
 
-  const cashFlowSeries = []
+  const cashFlowSeries = [
+    { name: 'Cash Flow', data: [15000, 28000, 35000, 42000] },
+  ]
 
-  const materialDistributionOptions = {
+  const materialDistributionOptions: any = {
     chart: { type: 'donut' as const, toolbar: { show: true } },
     colors: ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#EF4444'],
     labels: ['Cement', 'Steel', 'Bricks', 'Sand', 'Paint'],
     tooltip: { theme: 'dark' as const },
   }
 
-  const materialDistributionSeries = []
+  const materialDistributionSeries = [35, 25, 20, 12, 8]
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -89,7 +105,7 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Budget vs Expense</h3>
-          <Chart
+          <SafeChart
             options={budgetVsExpenseOptions}
             series={budgetVsExpenseSeries}
             type="bar"
@@ -103,7 +119,7 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Monthly Expense Trend</h3>
-          <Chart
+          <SafeChart
             options={monthlyExpenseOptions}
             series={monthlyExpenseSeries}
             type="line"
@@ -117,7 +133,7 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Cash Flow</h3>
-          <Chart
+          <SafeChart
             options={cashFlowOptions}
             series={cashFlowSeries}
             type="area"
@@ -131,7 +147,7 @@ export default function ReportOverview({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Material Cost Distribution</h3>
-          <Chart
+          <SafeChart
             options={materialDistributionOptions}
             series={materialDistributionSeries}
             type="donut"

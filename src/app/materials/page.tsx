@@ -5,7 +5,7 @@ import DashboardLayout from '@/layouts/DashboardLayout'
 import { motion } from 'framer-motion'
 import { Plus, Search, AlertCircle, TrendingDown } from 'lucide-react'
 
-const materials = []
+const materials: any[] = []
 
 export default function MaterialsPage() {
   const [searchTerm, setSearchTerm] = useState('')

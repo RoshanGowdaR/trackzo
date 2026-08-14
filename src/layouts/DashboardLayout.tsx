@@ -38,7 +38,7 @@ const navigationItems = [
   { icon: FileText, label: 'Reports', href: '/reports' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },
   { icon: Building2, label: 'Account Tracker', href: '/account-tracker' },
-  { icon: Settings, label: 'Settings', href: '/account-tracker/settings' },
+  { icon: Settings, label: 'Settings', href: '/settings' },
 ]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -46,6 +46,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
 
@@ -56,8 +57,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Auto-login user if not logged in (for development)
   useEffect(() => {
+    setMounted(true)
     if (!user) {
-      const defaultUser = { id: 1, name: 'Super Admin', email: 'admin@buildflow.com' }
+      const defaultUser = { id: '1', name: 'Super Admin', email: 'admin@buildflow.com', role: 'super_admin' as const, createdAt: new Date() }
       useAuthStore.setState({ user: defaultUser })
     }
     setIsLoading(false)
@@ -86,6 +88,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div
+      suppressHydrationWarning
       className="min-h-screen flex"
       style={{
         background: 'linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%)',

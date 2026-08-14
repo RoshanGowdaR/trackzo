@@ -1,15 +1,19 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import DashboardLayout from '@/layouts/DashboardLayout'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
 import { Plus } from 'lucide-react'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+import SafeChart from '@/components/SafeChart'
 
 export default function FinancePage() {
-  const expenseData = []
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const expenseData: any[] = []
 
   const totalIncome = 0
   const totalExpense = 0
@@ -93,22 +97,24 @@ export default function FinancePage() {
           {/* Cash Flow */}
           <div className="card">
             <h2 className="text-xl font-bold text-white mb-6">Monthly Cash Flow</h2>
-            <Chart
-              options={{
-                chart: { background: 'transparent', toolbar: { show: false } },
-                colors: ['#22c55e', '#ef4444'],
-                xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], labels: { style: { colors: '#94a3b8' } } },
-                yaxis: { labels: { style: { colors: '#94a3b8' } } },
-                grid: { borderColor: 'rgba(148, 163, 184, 0.1)' },
-                tooltip: { theme: 'dark' },
-              }}
-              series={[
-                { name: 'Income', data: [40000, 45000, 50000, 48000, 52000, 55000] },
-                { name: 'Expense', data: [35000, 40000, 42000, 41000, 45000, 47000] },
-              ]}
-              type="line"
-              height={250}
-            />
+            {mounted && (
+              <SafeChart
+                options={{
+                  chart: { background: 'transparent', width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false } },
+                  colors: ['#22c55e', '#ef4444'],
+                  xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], labels: { style: { colors: '#94a3b8' } } },
+                  yaxis: { labels: { style: { colors: '#94a3b8' } } },
+                  grid: { borderColor: 'rgba(148, 163, 184, 0.1)' },
+                  tooltip: { theme: 'dark' },
+                }}
+                series={[
+                  { name: 'Income', data: [40000, 45000, 50000, 48000, 52000, 55000] },
+                  { name: 'Expense', data: [35000, 40000, 42000, 41000, 45000, 47000] },
+                ]}
+                type="line"
+                height={250}
+              />
+            )}
           </div>
         </motion.div>
       </div>

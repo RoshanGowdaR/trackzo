@@ -23,15 +23,10 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react'
-import dynamic from 'next/dynamic'
+import SafeChart from '@/components/SafeChart'
 import { useProjectStore, type Material, type Project } from '@/store/useProjectStore'
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
-
-const Chart = dynamic(() => import('react-apexcharts'), {
-  ssr: false,
-  loading: () => <div className="h-80 bg-secondary-800/30 rounded-2xl animate-pulse" />,
-})
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Full Dashboard', icon: BarChart3 },
@@ -52,9 +47,12 @@ const SIDEBAR_ITEMS = [
 
 export default function ProjectDashboardPage() {
   const { selectedProjectId, getProjectById, addMaterial, deleteMaterial, loadFromStorage, updateProject, addExpense, deleteExpense } = useProjectStore()
+  const [mounted, setMounted] = useState(false)
 
   React.useEffect(() => {
     loadFromStorage()
+    const timer = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(timer)
   }, [loadFromStorage])
 
   const project = selectedProjectId ? getProjectById(selectedProjectId) : null
@@ -255,11 +253,11 @@ export default function ProjectDashboardPage() {
     // Basic Info
     pdf.setFontSize(12)
     pdf.setTextColor(0, 0, 0)
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Project Details', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
     pdf.text(`Project Name: ${project.name}`, 20, yPos)
     yPos += 6
@@ -273,11 +271,11 @@ export default function ProjectDashboardPage() {
     yPos += 10
 
     // Financial Summary
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Financial Summary', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.text(`Total Budget: ₹${(project.budget / 100000).toFixed(1)}L`, 20, yPos)
     yPos += 6
     pdf.text(`Expenses: ₹${(project.expenses / 100000).toFixed(1)}L`, 20, yPos)
@@ -290,11 +288,11 @@ export default function ProjectDashboardPage() {
     yPos += 10
 
     // Property Details
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Property Details', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.text(`Length: ${project.length}m | Width: ${project.width}m | Area: ${project.area}m²`, 20, yPos)
     yPos += 6
     pdf.text(`Square Feet: ${Math.round(project.area * 10.764)} sqft`, 20, yPos)
@@ -355,16 +353,16 @@ export default function ProjectDashboardPage() {
 
     pdf.setFontSize(12)
     pdf.setTextColor(0, 0, 0)
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Project: ' + project.name, 20, yPos)
     yPos += 10
 
     // Budget Summary
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Budget Summary', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
     pdf.text(`Total Budget: ₹${(project.budget / 100000).toFixed(1)}L`, 20, yPos)
     yPos += 6
@@ -378,11 +376,11 @@ export default function ProjectDashboardPage() {
     yPos += 10
 
     // Cost Breakdown
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Cost Breakdown', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.text(`Material Cost: ₹${(project.materialCost / 100000).toFixed(1)}L (${project.budget > 0 ? ((project.materialCost / project.budget) * 100).toFixed(1) : '0'}%)`, 20, yPos)
     yPos += 6
     pdf.text(`Labour Cost: ₹${(project.labourCost / 100000).toFixed(1)}L (${project.budget > 0 ? ((project.labourCost / project.budget) * 100).toFixed(1) : '0'}%)`, 20, yPos)
@@ -390,11 +388,11 @@ export default function ProjectDashboardPage() {
 
     // Expenses List
     if (filteredExpenses.length > 0) {
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('Expenses Details (Filtered by Date Range)', 20, yPos)
       yPos += 8
 
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       filteredExpenses.forEach((exp) => {
         pdf.text(`${exp.date} | ${exp.category} | ₹${exp.amount.toLocaleString()} - ${exp.description}`, 20, yPos)
         yPos += 6
@@ -452,15 +450,15 @@ export default function ProjectDashboardPage() {
 
     pdf.setFontSize(12)
     pdf.setTextColor(0, 0, 0)
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Project: ' + project.name, 20, yPos)
     yPos += 10
 
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Materials Summary', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
     pdf.text(`Total Materials: ${project.materials.length}`, 20, yPos)
     yPos += 6
@@ -468,11 +466,11 @@ export default function ProjectDashboardPage() {
     yPos += 10
 
     // Materials List
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Material Details', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(9)
 
     project.materials.forEach((material) => {
@@ -537,15 +535,15 @@ export default function ProjectDashboardPage() {
 
     pdf.setFontSize(12)
     pdf.setTextColor(0, 0, 0)
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Project: ' + project.name, 20, yPos)
     yPos += 10
 
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Labour Summary', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
     pdf.text(`Total Labour Cost: ₹${(project.labourCost / 100000).toFixed(1)}L`, 20, yPos)
     yPos += 6
@@ -555,11 +553,11 @@ export default function ProjectDashboardPage() {
     yPos += 10
 
     // Construction Phases
-    pdf.setFont(undefined, 'bold')
+    pdf.setFont('helvetica', 'bold')
     pdf.text('Construction Phases Progress', 20, yPos)
     yPos += 8
 
-    pdf.setFont(undefined, 'normal')
+    pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(9)
     Object.entries(constructionForm).forEach(([key, value]) => {
       pdf.text(`${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}`, 20, yPos)
@@ -634,7 +632,7 @@ export default function ProjectDashboardPage() {
     XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary')
 
     // Sheet 2: Financial Details
-    const financialData = [
+    const financialData: any[][] = [
       ['FINANCIAL REPORT'],
       [`Project: ${project.name}`],
       [`Date Range: ${dateRange.startDate} to ${dateRange.endDate}`],
@@ -649,7 +647,7 @@ export default function ProjectDashboardPage() {
     XLSX.utils.book_append_sheet(wb, financialSheet, 'Expenses')
 
     // Sheet 3: Materials
-    const materialsData = [
+    const materialsData: any[][] = [
       ['MATERIAL REPORT'],
       [`Project: ${project.name}`],
       [],
@@ -664,7 +662,7 @@ export default function ProjectDashboardPage() {
     XLSX.utils.book_append_sheet(wb, materialsSheet, 'Materials')
 
     // Sheet 4: Construction Progress
-    const constructionData = [
+    const constructionData: any[][] = [
       ['CONSTRUCTION PROGRESS REPORT'],
       [`Project: ${project.name}`],
       [],
@@ -681,7 +679,7 @@ export default function ProjectDashboardPage() {
   }
 
   const progressChartOptions = {
-    chart: { type: 'radialBar' as const, toolbar: { show: false } },
+    chart: { type: 'radialBar' as const, width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false } },
     colors: ['#3B82F6'],
     plotOptions: {
       radialBar: {
@@ -696,11 +694,19 @@ export default function ProjectDashboardPage() {
   }
 
   const expenseChartOptions = {
-    chart: { type: 'donut' as const, toolbar: { show: false } },
+    chart: { type: 'donut' as const, width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false } },
     colors: ['#10B981', '#EF4444', '#F59E0B'],
     labels: ['Remaining Budget', 'Expenses', 'Reserved'],
     tooltip: { theme: 'dark' as const },
     legend: { position: 'bottom' as const },
+  }
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    )
   }
 
   if (!project) {
@@ -1015,11 +1021,25 @@ export default function ProjectDashboardPage() {
             <motion.div key="overview" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-secondary-900/80 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
                 <h3 className="text-lg font-bold text-white mb-4">Project Progress</h3>
-                <Chart options={progressChartOptions} series={[project.progress]} type="radialBar" height={280} />
+                {mounted && (
+                  <SafeChart
+                    options={progressChartOptions}
+                    series={[project.progress > 0 ? project.progress : 1]}
+                    type="radialBar"
+                    height={280}
+                  />
+                )}
               </div>
               <div className="bg-secondary-900/80 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
                 <h3 className="text-lg font-bold text-white mb-4">Budget Breakdown</h3>
-                <Chart options={expenseChartOptions} series={[remainingBudget, project.expenses, 0]} type="donut" height={280} />
+                {mounted && (
+                  <SafeChart
+                    options={expenseChartOptions}
+                    series={(remainingBudget + project.expenses > 0) ? [remainingBudget, project.expenses, 0] : [100, 0, 0]}
+                    type="donut"
+                    height={280}
+                  />
+                )}
               </div>
             </motion.div>
           )}

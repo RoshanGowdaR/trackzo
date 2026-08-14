@@ -1,11 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
+import SafeChart from '@/components/SafeChart'
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 interface Filters {
   dateRange: { start: string; end: string }
@@ -18,9 +16,22 @@ interface Filters {
 }
 
 export default function ReportFinancial({ filters }: { filters: Filters }) {
-  const financialMetrics = []
+  const [mounted, setMounted] = useState(false)
 
-  const cashFlowOptions = {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  const financialMetrics: any[] = [
+    { label: 'Total Inflow', value: 850000, color: 'text-emerald-400', bg: 'bg-emerald-900/20', icon: '💰' },
+    { label: 'Total Outflow', value: 540000, color: 'text-amber-400', bg: 'bg-amber-900/20', icon: '💸' },
+    { label: 'Net Profit', value: 310000, color: 'text-blue-400', bg: 'bg-blue-900/20', icon: '📈' },
+    { label: 'Pending Receivables', value: 120000, color: 'text-purple-400', bg: 'bg-purple-900/20', icon: '⏳' },
+  ]
+
+  const cashFlowOptions: any = {
     chart: { type: 'line' as const, toolbar: { show: true } },
     colors: ['#22C55E', '#EF4444'],
     xaxis: { categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4'] },
@@ -30,7 +41,10 @@ export default function ReportFinancial({ filters }: { filters: Filters }) {
     legend: { position: 'top' as const },
   }
 
-  const cashFlowSeries = []
+  const cashFlowSeries = [
+    { name: 'Inflow', data: [150000, 220000, 180000, 300000] },
+    { name: 'Outflow', data: [110000, 140000, 120000, 170000] },
+  ]
 
   return (
     <motion.div
@@ -62,7 +76,7 @@ export default function ReportFinancial({ filters }: { filters: Filters }) {
         className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
       >
         <h3 className="text-xl font-bold text-white mb-6">Cash Flow Analysis</h3>
-        <Chart
+        <SafeChart
           options={cashFlowOptions}
           series={cashFlowSeries}
           type="line"

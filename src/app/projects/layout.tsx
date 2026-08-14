@@ -12,6 +12,7 @@ export default function ProjectsLayout({
   children: React.ReactNode
 }) {
   const { projects, selectedProjectId, setSelectedProjectId, addProject, updateProject, deleteProject, loadFromStorage, getProjectById } = useProjectStore()
+  const [mounted, setMounted] = useState(false)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -21,6 +22,7 @@ export default function ProjectsLayout({
 
   React.useEffect(() => {
     loadFromStorage()
+    setMounted(true)
   }, [loadFromStorage])
   const [formData, setFormData] = useState({
     name: '',
@@ -60,6 +62,7 @@ export default function ProjectsLayout({
       materialCost: 0,
       labourCost: 0,
       materials: [],
+      expenseDetails: [],
     }
 
     addProject(newProject)
@@ -180,8 +183,8 @@ export default function ProjectsLayout({
             New Project
           </motion.button>
 
-          <div className="space-y-3">
-            {projects.map(project => (
+          <div suppressHydrationWarning className="space-y-3">
+            {mounted && projects.map(project => (
               <motion.div
                 key={project.id}
                 whileHover={{ scale: 1.02 }}

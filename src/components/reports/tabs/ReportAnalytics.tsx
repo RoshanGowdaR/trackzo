@@ -1,10 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+import SafeChart from '@/components/SafeChart'
 
 interface Filters {
   dateRange: { start: string; end: string }
@@ -17,6 +15,14 @@ interface Filters {
 }
 
 export default function ReportAnalytics({ filters }: { filters: Filters }) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
   const topSpendingOptions = {
     chart: { type: 'bar' as const, toolbar: { show: true } },
     colors: ['#2563EB'],
@@ -77,7 +83,7 @@ export default function ReportAnalytics({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Top Spending Materials</h3>
-          <Chart
+          <SafeChart
             options={topSpendingOptions}
             series={topSpendingSeries}
             type="bar"
@@ -91,7 +97,7 @@ export default function ReportAnalytics({ filters }: { filters: Filters }) {
           className="bg-gradient-to-br from-secondary-900/50 to-secondary-900/30 border border-white/10 rounded-2xl p-6 backdrop-blur-sm"
         >
           <h3 className="text-xl font-bold text-white mb-6">Cost Variance</h3>
-          <Chart
+          <SafeChart
             options={costVarianceOptions}
             series={costVarianceSeries}
             type="pie"

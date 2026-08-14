@@ -8,11 +8,9 @@ import ProjectCard from '@/components/account-tracker/ProjectCard'
 import DataTable from '@/components/account-tracker/DataTable'
 import ActivityTimeline from '@/components/account-tracker/ActivityTimeline'
 import { Plus, X, Send, CheckCircle, FileText, Users, Wallet, BarChart3, TrendingUp } from 'lucide-react'
-import dynamic from 'next/dynamic'
+import SafeChart from '@/components/SafeChart'
 import { formatCurrency, formatDate } from '@/utils/construction'
 import type { Project } from '@/types/construction'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false, loading: () => <div className="h-80 bg-secondary-800/30 rounded-2xl animate-pulse" /> })
 
 export default function EnhancedAccountTrackerPage() {
   const [activeModal, setActiveModal] = useState<string | null>(null)
@@ -197,7 +195,7 @@ export default function EnhancedAccountTrackerPage() {
                   className="lg:col-span-2 bg-gradient-to-br from-secondary-800/50 via-secondary-900/50 to-secondary-900/30 border border-white/5 rounded-2xl p-6 backdrop-blur-xl"
                 >
                   <h3 className="text-lg font-bold text-white mb-6">Project Status Distribution</h3>
-                  <Chart
+                  <SafeChart
                     options={{
                       chart: { type: 'donut' as const, toolbar: { show: false } },
                       colors: ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6'],

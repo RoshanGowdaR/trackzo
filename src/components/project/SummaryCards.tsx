@@ -3,9 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DollarSign, TrendingUp, Package, Users } from 'lucide-react'
-import dynamic from 'next/dynamic'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+import SafeChart from '@/components/SafeChart'
 
 interface SummaryCardProps {
   projectId: number
@@ -28,6 +26,13 @@ const SummaryCard = ({ icon: Icon, label, value, color }: any) => (
 )
 
 export default function SummaryCards({ projectId }: SummaryCardProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
   const [chartData, setChartData] = useState({
     progress: 65,
     budget: 250000,
@@ -37,9 +42,13 @@ export default function SummaryCards({ projectId }: SummaryCardProps) {
     profit: 37500,
   })
 
+  if (!mounted) {
+    return <div className="h-80 bg-secondary-800/20 rounded-2xl animate-pulse" />
+  }
+
   // Charts data
-  const progressChartOptions = {
-    chart: { type: 'radialBar', background: 'transparent' },
+  const progressChartOptions: any = {
+    chart: { type: 'radialBar', width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, background: 'transparent' },
     colors: ['#2563eb'],
     plotOptions: {
       radialBar: {
@@ -55,8 +64,8 @@ export default function SummaryCards({ projectId }: SummaryCardProps) {
     tooltip: { theme: 'dark' },
   }
 
-  const expenseChartOptions = {
-    chart: { type: 'donut', background: 'transparent', toolbar: { show: false } },
+  const expenseChartOptions: any = {
+    chart: { type: 'donut', width: '100%', redrawOnParentResize: true, redrawOnWindowResize: true, background: 'transparent', toolbar: { show: false } },
     colors: ['#22c55e', '#f59e0b', '#ef4444'],
     labels: ['Material Cost', 'Labour Cost', 'Other Costs'],
     legend: { labels: { colors: '#94a3b8' }, position: 'bottom' as const },
@@ -129,7 +138,7 @@ export default function SummaryCards({ projectId }: SummaryCardProps) {
         {/* Progress Chart */}
         <motion.div className="card lg:col-span-1">
           <h3 className="text-xl font-bold text-white mb-6">Project Progress</h3>
-          <Chart
+          <SafeChart
             options={progressChartOptions}
             series={[chartData.progress]}
             type="radialBar"
@@ -140,12 +149,23 @@ export default function SummaryCards({ projectId }: SummaryCardProps) {
         {/* Expense Breakdown */}
         <motion.div className="card lg:col-span-2">
           <h3 className="text-xl font-bold text-white mb-6">Expense Breakdown</h3>
-          <Chart
-            options={expenseChartOptions}
-            series={[chartData.material_cost, chartData.labour_cost, chartData.spent - chartData.material_cost - chartData.labour_cost]}
-            type="donut"
-            height={300}
-          />
+          {(() => {
+            const rawDonutSeries = [
+              chartData.material_cost || 0,
+              chartData.labour_cost || 0,
+              Math.max(0, chartData.spent - chartData.material_cost - chartData.labour_cost) || 0,
+            ]
+            const sumDonut = rawDonutSeries.reduce((a, b) => a + b, 0)
+            const donutSeries = sumDonut > 0 ? rawDonutSeries : [50000, 30000, 20000]
+            return (
+              <SafeChart
+                options={expenseChartOptions}
+                series={donutSeries}
+                type="donut"
+                height={300}
+              />
+            )
+          })()}
         </motion.div>
       </motion.div>
 

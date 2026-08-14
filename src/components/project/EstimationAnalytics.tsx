@@ -2,8 +2,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { TrendingUp, Plus, X, BarChart3, Target } from 'lucide-react'
-import { useState } from 'react'
-import Chart from 'react-apexcharts'
+import { useState, useEffect } from 'react'
+import SafeChart from '@/components/SafeChart'
 
 interface CompletedProject {
   id: number
@@ -82,8 +82,15 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
     },
   ])
 
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
   const [showEstimationModal, setShowEstimationModal] = useState(false)
-  const [estimationData, setEstimationData] = useState<EstimationData>({
+  const [estimationData, setEstimationData] = useState<any>({
     projectName: '',
     area: '',
     floors: '',
@@ -123,7 +130,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
   }))
 
   // ApexCharts configurations
-  const pieChartOptions = {
+  const pieChartOptions: any = {
     chart: { type: 'pie' as const },
     labels: costBreakdown.map(item => item.name),
     colors: ['#2563EB', '#06B6D4', '#22C55E'],
@@ -137,7 +144,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
     }
   }
 
-  const barChartOptions = {
+  const barChartOptions: any = {
     chart: { type: 'bar' as const, toolbar: { show: false } },
     colors: ['#2563EB', '#06B6D4'],
     xaxis: { categories: costTrendData.map(d => d.name) },
@@ -148,7 +155,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
     dataLabels: { enabled: false }
   }
 
-  const lineChartOptions = {
+  const lineChartOptions: any = {
     chart: { type: 'line' as const, toolbar: { show: false } },
     colors: ['#22C55E'],
     xaxis: { categories: performanceData.map(d => d.name) },
@@ -200,6 +207,8 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
     })
   }
 
+  if (!mounted) return null
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div className="flex justify-between items-center">
@@ -236,7 +245,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div className="card">
           <h3 className="text-xl font-bold text-white mb-6">Average Cost Breakdown</h3>
-          <Chart
+          <SafeChart
             type="pie"
             options={pieChartOptions}
             series={costBreakdown.map(item => item.value)}
@@ -246,7 +255,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
 
         <motion.div className="card">
           <h3 className="text-xl font-bold text-white mb-6">Budget vs Actual Cost</h3>
-          <Chart
+          <SafeChart
             type="bar"
             options={barChartOptions}
             series={[
@@ -261,7 +270,7 @@ export default function EstimationAnalytics({ projectId }: { projectId: number }
       {/* Performance Accuracy */}
       <motion.div className="card">
         <h3 className="text-xl font-bold text-white mb-6">Estimation Accuracy</h3>
-        <Chart
+        <SafeChart
           type="line"
           options={lineChartOptions}
           series={[{ name: 'Accuracy %', data: performanceData.map(d => d.accuracy) }]}

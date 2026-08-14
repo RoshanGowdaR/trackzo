@@ -6,7 +6,7 @@ import DashboardLayout from '@/layouts/DashboardLayout'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Mail, Phone, MapPin, MoreVertical, X } from 'lucide-react'
 
-const initialClients = []
+const initialClients: any[] = []
 
 export default function ClientsPage() {
   const router = useRouter()

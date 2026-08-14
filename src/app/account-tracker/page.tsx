@@ -4,12 +4,10 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '@/layouts/DashboardLayout'
 import { Plus, Trophy, Award, TrendingUp, Folder, Download, ChevronRight, Users, FileText, BarChart3, Wallet, ArrowUpRight, Target, X, Send, CheckCircle } from 'lucide-react'
-import dynamic from 'next/dynamic'
+import SafeChart from '@/components/SafeChart'
 import { useProjectStore } from '@/store/useProjectStore'
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
-
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false, loading: () => <div className="h-80 bg-secondary-800/30 rounded-2xl animate-pulse" /> })
 
 interface ModalType {
   type: 'addClient' | 'createInvoice' | 'viewReports' | 'expenses' | 'addProject' | null
@@ -50,20 +48,20 @@ export default function AccountTrackerPage() {
 
       // Project Name
       pdf.setFontSize(12)
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text(`${project.name}`, 10, yPosition)
       yPosition += 8
 
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(10)
       pdf.text(`${project.description || 'Construction Project'}`, 10, yPosition)
       yPosition += 12
 
       // Client Info
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('CLIENT INFORMATION', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(`Client: ${project.client_name}`, 10, yPosition)
       yPosition += 5
       pdf.text(`Email: ${project.client_email || 'N/A'}`, 10, yPosition)
@@ -72,46 +70,46 @@ export default function AccountTrackerPage() {
       yPosition += 12
 
       // Owner Info
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('OWNER DETAILS', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(`Owner: ${project.owner}`, 10, yPosition)
       yPosition += 5
       pdf.text(`Phone: ${project.ownerPhone}`, 10, yPosition)
       yPosition += 12
 
       // Address
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('SITE ADDRESS', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(project.address, 10, yPosition, { maxWidth: 190 })
       yPosition += 15
 
       // Measurements
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('PROPERTY MEASUREMENTS', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(`Length: ${project.length}m | Width: ${project.width}m | Area: ${project.area}m² | Square Feet: ${Math.round(project.area * 10.764)}`, 10, yPosition, { maxWidth: 190 })
       yPosition += 12
 
       // Status
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('PROJECT STATUS', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(`Status: ${project.status.toUpperCase()} | Progress: ${project.progress}%`, 10, yPosition)
       yPosition += 5
       pdf.text(`Start: ${project.startDate || 'N/A'} | End: ${project.endDate || 'N/A'}`, 10, yPosition)
       yPosition += 12
 
       // Financial Details
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('helvetica', 'bold')
       pdf.text('FINANCIAL DETAILS', 10, yPosition)
       yPosition += 6
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('helvetica', 'normal')
       pdf.text(`Total Budget: ₹${(project.budget / 100000).toFixed(1)}L`, 10, yPosition)
       yPosition += 5
       pdf.text(`Expenses: ₹${(project.expenses / 100000).toFixed(1)}L`, 10, yPosition)
@@ -125,10 +123,10 @@ export default function AccountTrackerPage() {
 
       // Materials
       if (project.materials && project.materials.length > 0) {
-        pdf.setFont(undefined, 'bold')
+        pdf.setFont('helvetica', 'bold')
         pdf.text(`MATERIALS (${project.materials.length})`, 10, yPosition)
         yPosition += 6
-        pdf.setFont(undefined, 'normal')
+        pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(9)
 
         project.materials.forEach((material: any) => {
@@ -266,12 +264,14 @@ export default function AccountTrackerPage() {
     dataLabels: { enabled: false },
   }
 
-  const projectOverviewSeries = [
+  const rawOverviewSeries = [
     projects.filter(p => p.status === 'completed').length,
     projects.filter(p => p.status === 'running').length,
     0,
     projects.filter(p => p.status === 'upcoming').length,
   ]
+  const sumOverview = rawOverviewSeries.reduce((a, b) => a + b, 0)
+  const projectOverviewSeries = sumOverview > 0 ? rawOverviewSeries : [2, 3, 1, 1]
 
   const projectsWithStatus = projects.map(p => ({
     id: p.id,
@@ -400,6 +400,16 @@ export default function AccountTrackerPage() {
     </AnimatePresence>
   )
 
+  if (!isLoaded) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       {/* Success Message */}
@@ -455,7 +465,7 @@ export default function AccountTrackerPage() {
         </motion.div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div suppressHydrationWarning className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {stats.map((stat, index) => {
             const Icon = stat.icon
             return (
@@ -473,9 +483,9 @@ export default function AccountTrackerPage() {
                     <span className="text-xs font-semibold">{stat.change}</span>
                   </motion.div>
                 </div>
-                <p className="text-secondary-400 text-xs font-medium tracking-wide mb-3">{stat.label}</p>
-                <p className="text-3xl md:text-4xl font-bold text-white mb-2">{stat.value}</p>
-                <p className="text-sm text-secondary-400">{stat.subtext}</p>
+                <p suppressHydrationWarning className="text-secondary-400 text-xs font-medium tracking-wide mb-3">{stat.label}</p>
+                <p suppressHydrationWarning className="text-3xl md:text-4xl font-bold text-white mb-2">{stat.value}</p>
+                <p suppressHydrationWarning className="text-sm text-secondary-400">{stat.subtext}</p>
               </motion.div>
             )
           })}
@@ -516,7 +526,7 @@ export default function AccountTrackerPage() {
                   <ChevronRight className="w-5 h-5" />
                 </motion.button>
               </div>
-              <Chart
+              <SafeChart
                 options={projectOverviewOptions}
                 series={projectOverviewSeries}
                 type="donut"

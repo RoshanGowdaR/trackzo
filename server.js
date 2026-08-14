@@ -1,260 +1,635 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Database setup
-const dbPath = path.join(__dirname, 'buildflow.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error('Database error:', err);
-  else console.log('✅ SQLite database connected');
-});
+// Session middleware
+const { sessionConfig } = require('./php-version/config/session');
+app.use(sessionConfig);
+
+// JS View Controllers (replaces former PHP files)
+const { renderDashboard } = require('./php-version/index');
+const { handleLogin } = require('./php-version/login');
+const { handleLogout } = require('./php-version/logout');
+const { renderProjects } = require('./php-version/projects/index');
+const { renderProjectView } = require('./php-version/projects/view');
+const { handleDeleteMaterial } = require('./php-version/projects/delete-material');
+const { renderClients } = require('./php-version/clients/index');
+const { renderMaterials } = require('./php-version/materials/index');
+const { renderFinance } = require('./php-version/finance/index');
+const { renderEstimation } = require('./php-version/estimation/index');
+const { renderCalendar } = require('./php-version/calendar/index');
+const { renderReports } = require('./php-version/reports/index');
+const { renderSettings } = require('./php-version/settings/index');
+const { renderDocuments } = require('./php-version/documents/index');
+
+// Serve static assets if present
+if (fs.existsSync(path.join(__dirname, 'php-version', 'assets'))) {
+  app.use('/assets', express.static(path.join(__dirname, 'php-version', 'assets')));
+}
+
+// ==================== DATABASE SETUP ====================
+const usePg = !!process.env.DATABASE_URL;
+let pgPool = null;
+let sqliteDb = null;
+
+if (usePg) {
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  console.log('⚡ Connected to Neon Cloud PostgreSQL Database!');
+} else {
+  const dbPath = process.env.DB_PATH || path.join(__dirname, 'buildflow.db');
+  sqliteDb = new sqlite3.Database(dbPath, (err) => {
+    if (err) console.error('SQLite Database error:', err);
+    else console.log('✅ SQLite database connected at:', dbPath);
+  });
+}
+
+// Query helper supporting both Neon PostgreSQL ($1, $2) and SQLite (?)
+const query = async (sql, params = []) => {
+  if (usePg) {
+    let paramIndex = 1;
+    const pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    const res = await pgPool.query(pgSql, params);
+    return res.rows;
+  } else {
+    return new Promise((resolve, reject) => {
+      sqliteDb.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  }
+};
+
+const execute = async (sql, params = []) => {
+  if (usePg) {
+    let paramIndex = 1;
+    const pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    const res = await pgPool.query(pgSql + (sql.trim().toUpperCase().startsWith('INSERT') ? ' RETURNING id' : ''), params);
+    const lastID = res.rows[0] ? res.rows[0].id : null;
+    return { lastID, rowCount: res.rowCount };
+  } else {
+    return new Promise((resolve, reject) => {
+      sqliteDb.run(sql, params, function(err) {
+        if (err) reject(err);
+        else resolve({ lastID: this.lastID, changes: this.changes });
+      });
+    });
+  }
+};
 
 // Initialize database tables
-const initDatabase = () => {
-  db.serialize(() => {
+const initDatabase = async () => {
+  try {
+    const idType = usePg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    const timestampType = usePg ? 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' : 'DATETIME DEFAULT CURRENT_TIMESTAMP';
+
+    // Users table
+    await query(`CREATE TABLE IF NOT EXISTS users (
+      id ${idType},
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      role VARCHAR(50) DEFAULT 'super_admin',
+      company VARCHAR(255) DEFAULT 'BuildFlow',
+      created_at ${timestampType}
+    )`);
+
     // Projects table
-    db.run(`CREATE TABLE IF NOT EXISTS projects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
+    await query(`CREATE TABLE IF NOT EXISTS projects (
+      id ${idType},
+      name VARCHAR(255) NOT NULL,
       description TEXT,
       client_id INTEGER,
-      status TEXT,
-      start_date TEXT,
-      end_date TEXT,
-      budget REAL,
-      spent REAL,
-      progress INTEGER,
+      client_name VARCHAR(255),
+      client_email VARCHAR(255),
+      client_phone VARCHAR(255),
+      owner VARCHAR(255),
+      owner_phone VARCHAR(255),
       address TEXT,
-      square_feet REAL,
-      building_type TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      length NUMERIC,
+      width NUMERIC,
+      area NUMERIC,
+      status VARCHAR(50) DEFAULT 'upcoming',
+      progress INTEGER DEFAULT 0,
+      budget NUMERIC DEFAULT 0,
+      spent NUMERIC DEFAULT 0,
+      material_cost NUMERIC DEFAULT 0,
+      labour_cost NUMERIC DEFAULT 0,
+      start_date VARCHAR(50),
+      end_date VARCHAR(50),
+      square_feet NUMERIC,
+      building_type VARCHAR(100),
+      created_at ${timestampType}
     )`);
 
     // Clients table
-    db.run(`CREATE TABLE IF NOT EXISTS clients (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE,
-      phone TEXT,
+    await query(`CREATE TABLE IF NOT EXISTS clients (
+      id ${idType},
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(255),
       address TEXT,
-      company TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      company VARCHAR(255),
+      city VARCHAR(100),
+      state VARCHAR(100),
+      zip_code VARCHAR(50),
+      total_projects INTEGER DEFAULT 0,
+      total_paid NUMERIC DEFAULT 0,
+      created_at ${timestampType}
     )`);
 
     // Materials table
-    db.run(`CREATE TABLE IF NOT EXISTS materials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      category TEXT,
-      quantity REAL,
-      unit TEXT,
-      unit_price REAL,
-      supplier TEXT,
-      status TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    await query(`CREATE TABLE IF NOT EXISTS materials (
+      id ${idType},
+      project_id INTEGER,
+      name VARCHAR(255) NOT NULL,
+      category VARCHAR(100),
+      quantity NUMERIC DEFAULT 0,
+      used NUMERIC DEFAULT 0,
+      unit VARCHAR(50),
+      unit_price NUMERIC DEFAULT 0,
+      cost NUMERIC DEFAULT 0,
+      supplier VARCHAR(255),
+      purchase_date VARCHAR(50),
+      status VARCHAR(50) DEFAULT 'in_stock',
+      created_at ${timestampType}
     )`);
 
     // Expenses table
-    db.run(`CREATE TABLE IF NOT EXISTS expenses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    await query(`CREATE TABLE IF NOT EXISTS expenses (
+      id ${idType},
       project_id INTEGER,
       description TEXT,
-      category TEXT,
-      amount REAL,
-      date TEXT,
-      payment_method TEXT,
-      status TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      category VARCHAR(100) NOT NULL,
+      amount NUMERIC NOT NULL,
+      date VARCHAR(50),
+      payment_method VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'approved',
+      created_at ${timestampType}
     )`);
 
     // Estimations table
-    db.run(`CREATE TABLE IF NOT EXISTS estimations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    await query(`CREATE TABLE IF NOT EXISTS estimations (
+      id ${idType},
       project_id INTEGER,
-      category TEXT,
+      category VARCHAR(100),
       description TEXT,
-      quantity REAL,
-      unit TEXT,
-      unit_price REAL,
-      total_price REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      quantity NUMERIC,
+      unit VARCHAR(50),
+      unit_price NUMERIC,
+      total_price NUMERIC,
+      created_at ${timestampType}
     )`);
-  });
+
+    // Invoices table
+    await query(`CREATE TABLE IF NOT EXISTS invoices (
+      id ${idType},
+      project_id INTEGER,
+      client_id INTEGER,
+      invoice_number VARCHAR(100),
+      amount NUMERIC DEFAULT 0,
+      paid_amount NUMERIC DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'draft',
+      due_date VARCHAR(50),
+      created_at ${timestampType}
+    )`);
+
+    // Activity Log table
+    await query(`CREATE TABLE IF NOT EXISTS activity_log (
+      id ${idType},
+      action VARCHAR(255),
+      project_id INTEGER,
+      details TEXT,
+      created_at ${timestampType}
+    )`);
+
+    // Documents table
+    await query(`CREATE TABLE IF NOT EXISTS documents (
+      id ${idType},
+      project_id INTEGER,
+      file_name VARCHAR(255) NOT NULL,
+      file_type VARCHAR(100),
+      file_path TEXT,
+      file_size INTEGER,
+      description TEXT,
+      uploaded_at ${timestampType}
+    )`);
+
+    // Seed default admin user if missing
+    const users = await query(`SELECT * FROM users WHERE email = ?`, ['admin@buildflow.com']);
+    if (!users || users.length === 0) {
+      await execute(
+        `INSERT INTO users (name, email, password, role, company) VALUES (?, ?, ?, ?, ?)`,
+        ['Super Admin', 'admin@buildflow.com', 'admin123', 'super_admin', 'BuildFlow ERP']
+      );
+      console.log('👤 Default Super Admin User Seeded (admin@buildflow.com / admin123)');
+    }
+
+    console.log('✅ Database Schema Initialized Successfully!');
+  } catch (err) {
+    console.error('❌ Database Initialization Error:', err.message);
+  }
 };
 
 initDatabase();
 
-// ==================== PROJECTS ====================
-app.get('/api/projects', (req, res) => {
-  db.all(`SELECT p.*, c.name as client_name FROM projects p
-          LEFT JOIN clients c ON p.client_id = c.id
-          ORDER BY p.created_at DESC`, (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows || []);
-  });
-});
+// Helper to log activities
+const logActivity = async (action, details, project_id = null) => {
+  try {
+    await execute(`INSERT INTO activity_log (action, details, project_id) VALUES (?, ?, ?)`, [action, details, project_id]);
+  } catch (e) {}
+};
 
-app.post('/api/projects', (req, res) => {
-  const { name, client_id, status, start_date, budget } = req.body;
-  db.run(
-    `INSERT INTO projects (name, client_id, status, start_date, budget, spent, progress)
-     VALUES (?, ?, ?, ?, ?, 0, 0)`,
-    [name, client_id, status || 'upcoming', start_date, budget || 0],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: this.lastID, name, client_id, status, start_date, budget });
+// ==================== AUTHENTICATION API ====================
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, username, password } = req.body;
+    const loginIdentifier = (email || username || '').trim();
+
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: 'Please provide email/username and password' });
     }
-  );
-});
 
-app.put('/api/projects/:id', (req, res) => {
-  const { name, client_id, status, budget, progress } = req.body;
-  db.run(
-    `UPDATE projects SET name=?, client_id=?, status=?, budget=?, progress=? WHERE id=?`,
-    [name, client_id, status, budget, progress, req.params.id],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: req.params.id, name, client_id, status, budget, progress });
+    // Find user in Neon DB or SQLite
+    let users = await query(`SELECT * FROM users WHERE email = ? OR name = ?`, [loginIdentifier, loginIdentifier]);
+
+    let user = users && users[0];
+
+    if (!user) {
+      // Auto-register user if logging in for the first time
+      const name = loginIdentifier.includes('@') ? loginIdentifier.split('@')[0] : loginIdentifier;
+      const userEmail = loginIdentifier.includes('@') ? loginIdentifier : `${loginIdentifier}@buildflow.com`;
+
+      const result = await execute(
+        `INSERT INTO users (name, email, password, role, company) VALUES (?, ?, ?, ?, ?)`,
+        [name, userEmail, password, 'super_admin', 'BuildFlow ERP']
+      );
+
+      const created = await query(`SELECT * FROM users WHERE email = ?`, [userEmail]);
+      user = created[0] || { id: result.lastID, name, email: userEmail, role: 'super_admin', company: 'BuildFlow ERP' };
     }
-  );
+
+    req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role, company: user.company };
+    logActivity('User Login', `User "${user.name}" logged into the system.`);
+
+    res.json({
+      success: true,
+      user: {
+        id: String(user.id),
+        name: user.name,
+        email: user.email,
+        role: user.role || 'super_admin',
+        company: user.company || 'BuildFlow ERP',
+        createdAt: user.created_at || new Date()
+      }
+    });
+  } catch (err) {
+    console.error('Login API error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/projects/:id', (req, res) => {
-  db.run(`DELETE FROM projects WHERE id=?`, [req.params.id], function(err) {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id: req.params.id });
-  });
-});
-
-// ==================== CLIENTS ====================
-app.get('/api/clients', (req, res) => {
-  db.all(`SELECT * FROM clients ORDER BY created_at DESC`, (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows || []);
-  });
-});
-
-app.post('/api/clients', (req, res) => {
-  const { name, email, phone, address, company } = req.body;
-  db.run(
-    `INSERT INTO clients (name, email, phone, address, company) VALUES (?, ?, ?, ?, ?)`,
-    [name, email, phone, address, company],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: this.lastID, name, email, phone, address, company });
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, company } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Please provide name, email, and password' });
     }
-  );
-});
 
-app.put('/api/clients/:id', (req, res) => {
-  const { name, email, phone, address, company } = req.body;
-  db.run(
-    `UPDATE clients SET name=?, email=?, phone=?, address=?, company=? WHERE id=?`,
-    [name, email, phone, address, company, req.params.id],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: req.params.id, name, email, phone, address, company });
+    const existing = await query(`SELECT * FROM users WHERE email = ?`, [email]);
+    if (existing && existing.length > 0) {
+      return res.status(400).json({ error: 'Email already registered. Please login.' });
     }
-  );
+
+    const result = await execute(
+      `INSERT INTO users (name, email, password, role, company) VALUES (?, ?, ?, ?, ?)`,
+      [name, email, password, 'super_admin', company || 'BuildFlow ERP']
+    );
+
+    const newUser = { id: String(result.lastID), name, email, role: 'super_admin', company: company || 'BuildFlow ERP', createdAt: new Date() };
+    req.session.user = newUser;
+
+    logActivity('User Registered', `New user "${name}" (${email}) registered.`);
+    res.json({ success: true, user: newUser });
+  } catch (err) {
+    console.error('Register API error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/clients/:id', (req, res) => {
-  db.run(`DELETE FROM clients WHERE id=?`, [req.params.id], function(err) {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id: req.params.id });
-  });
-});
-
-// ==================== MATERIALS ====================
-app.get('/api/materials', (req, res) => {
-  db.all(`SELECT * FROM materials ORDER BY created_at DESC`, (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows || []);
-  });
-});
-
-app.post('/api/materials', (req, res) => {
-  const { name, category, quantity, unit, unit_price, supplier, status } = req.body;
-  db.run(
-    `INSERT INTO materials (name, category, quantity, unit, unit_price, supplier, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, category, quantity, unit, unit_price, supplier, status || 'in_stock'],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: this.lastID, name, category, quantity, unit, unit_price, supplier, status });
+app.get('/api/auth/me', (req, res) => {
+  if (req.session && req.session.user) {
+    return res.json({ user: req.session.user });
+  }
+  res.json({
+    user: {
+      id: '1',
+      name: 'Super Admin',
+      email: 'admin@buildflow.com',
+      role: 'super_admin',
+      company: 'BuildFlow ERP',
+      createdAt: new Date()
     }
-  );
-});
-
-app.delete('/api/materials/:id', (req, res) => {
-  db.run(`DELETE FROM materials WHERE id=?`, [req.params.id], function(err) {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json({ success: true, id: req.params.id });
   });
 });
 
-// ==================== EXPENSES ====================
-app.get('/api/expenses', (req, res) => {
-  db.all(`SELECT * FROM expenses ORDER BY created_at DESC`, (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else res.json(rows || []);
-  });
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
 });
 
-app.post('/api/expenses', (req, res) => {
-  const { project_id, description, category, amount, date, payment_method, status } = req.body;
-  db.run(
-    `INSERT INTO expenses (project_id, description, category, amount, date, payment_method, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [project_id, description, category, amount, date, payment_method, status || 'pending'],
-    function(err) {
-      if (err) res.status(500).json({ error: err.message });
-      else res.json({ id: this.lastID, project_id, description, category, amount, date, payment_method, status });
+// ==================== PROJECTS API ====================
+app.get('/api/projects', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT p.*, COALESCE(p.client_name, c.name) as client_name
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      ORDER BY p.created_at DESC
+    `);
+    res.json(rows.map(r => ({
+      ...r,
+      id: Number(r.id),
+      budget: Number(r.budget || 0),
+      spent: Number(r.spent || 0),
+      progress: Number(r.progress || 0),
+      length: Number(r.length || 0),
+      width: Number(r.width || 0),
+      area: Number(r.area || 0),
+      materialCost: Number(r.material_cost || 0),
+      labourCost: Number(r.labour_cost || 0)
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id', async (req, res) => {
+  try {
+    const projects = await query(`
+      SELECT p.*, COALESCE(p.client_name, c.name) as client_name, c.email as client_email, c.phone as client_phone
+      FROM projects p LEFT JOIN clients c ON p.client_id = c.id
+      WHERE p.id = ?
+    `, [req.params.id]);
+
+    const project = projects && projects[0];
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const materials = await query(`SELECT * FROM materials WHERE project_id = ? ORDER BY created_at DESC`, [req.params.id]);
+    const expenses = await query(`SELECT * FROM expenses WHERE project_id = ? ORDER BY date DESC`, [req.params.id]);
+
+    res.json({
+      ...project,
+      id: Number(project.id),
+      budget: Number(project.budget || 0),
+      spent: Number(project.spent || 0),
+      expenses: Number(project.spent || 0),
+      progress: Number(project.progress || 0),
+      length: Number(project.length || 0),
+      width: Number(project.width || 0),
+      area: Number(project.area || 0),
+      materialCost: Number(project.material_cost || 0),
+      labourCost: Number(project.labour_cost || 0),
+      materials: (materials || []).map(m => ({ ...m, quantity: Number(m.quantity || 0), used: Number(m.used || 0), cost: Number(m.cost || 0) })),
+      expenseDetails: (expenses || []).map(e => ({ ...e, amount: Number(e.amount || 0) }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects', async (req, res) => {
+  try {
+    const { name, client_id, client_name, address, length, width, status, start_date, end_date, budget } = req.body;
+    const area = (length && width) ? (parseFloat(length) * parseFloat(width)) : null;
+
+    const result = await execute(
+      `INSERT INTO projects (name, client_id, client_name, address, length, width, area, status, start_date, end_date, budget, spent, progress)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+      [name, client_id || null, client_name || '', address || '', length || null, width || null, area, status || 'upcoming', start_date || null, end_date || null, budget || 0]
+    );
+
+    logActivity('Project Created', `Project "${name}" created.`, result.lastID);
+    res.json({ id: result.lastID, name, client_id, client_name, status, budget, area });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { name, client_id, client_name, status, budget, progress, start_date, end_date, address } = req.body;
+    await execute(
+      `UPDATE projects SET name=?, client_id=?, client_name=?, status=?, budget=?, progress=?, start_date=?, end_date=?, address=? WHERE id=?`,
+      [name, client_id, client_name, status, budget, progress, start_date, end_date, address, req.params.id]
+    );
+
+    logActivity('Project Updated', `Project ID ${req.params.id} updated.`, req.params.id);
+    res.json({ id: req.params.id, name, client_id, status, budget, progress });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    await execute(`DELETE FROM projects WHERE id=?`, [req.params.id]);
+    logActivity('Project Deleted', `Project ID ${req.params.id} deleted.`);
+    res.json({ success: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== CLIENTS API ====================
+app.get('/api/clients', async (req, res) => {
+  try {
+    const rows = await query(`SELECT * FROM clients ORDER BY created_at DESC`);
+    res.json(rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/clients', async (req, res) => {
+  try {
+    const { name, email, phone, address, company } = req.body;
+    const result = await execute(
+      `INSERT INTO clients (name, email, phone, address, company) VALUES (?, ?, ?, ?, ?)`,
+      [name, email, phone, address, company]
+    );
+    logActivity('Client Added', `Client "${name}" added.`);
+    res.json({ id: result.lastID, name, email, phone, address, company });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    const { name, email, phone, address, company } = req.body;
+    await execute(
+      `UPDATE clients SET name=?, email=?, phone=?, address=?, company=? WHERE id=?`,
+      [name, email, phone, address, company, req.params.id]
+    );
+    res.json({ id: req.params.id, name, email, phone, address, company });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    await execute(`DELETE FROM clients WHERE id=?`, [req.params.id]);
+    res.json({ success: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== MATERIALS API ====================
+app.get('/api/materials', async (req, res) => {
+  try {
+    const rows = await query(`SELECT * FROM materials ORDER BY created_at DESC`);
+    res.json(rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/materials', async (req, res) => {
+  try {
+    const { project_id, name, category, quantity, unit, unit_price, cost, supplier, purchase_date, status } = req.body;
+    const totalCost = cost || (quantity * unit_price) || 0;
+    const result = await execute(
+      `INSERT INTO materials (project_id, name, category, quantity, unit, unit_price, cost, supplier, purchase_date, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [project_id || null, name, category || 'General', quantity || 0, unit || 'Pcs', unit_price || 0, totalCost, supplier || '', purchase_date || new Date().toISOString().split('T')[0], status || 'in_stock']
+    );
+    logActivity('Material Added', `Material "${name}" added.`, project_id);
+    res.json({ id: result.lastID, project_id, name, category, quantity, unit, cost: totalCost, supplier, status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/materials/:id', async (req, res) => {
+  try {
+    await execute(`DELETE FROM materials WHERE id=?`, [req.params.id]);
+    res.json({ success: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== EXPENSES API ====================
+app.get('/api/expenses', async (req, res) => {
+  try {
+    const rows = await query(`SELECT * FROM expenses ORDER BY created_at DESC`);
+    res.json(rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/expenses', async (req, res) => {
+  try {
+    const { project_id, description, category, amount, date, payment_method, status } = req.body;
+    const result = await execute(
+      `INSERT INTO expenses (project_id, description, category, amount, date, payment_method, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [project_id || null, description || '', category, amount, date || new Date().toISOString().split('T')[0], payment_method || 'Cash', status || 'approved']
+    );
+
+    if (project_id) {
+      const sumRows = await query(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE project_id=?`, [project_id]);
+      const totalSpent = sumRows[0] ? sumRows[0].total : 0;
+      await execute(`UPDATE projects SET spent = ? WHERE id = ?`, [totalSpent, project_id]);
     }
-  );
+
+    logActivity('Expense Recorded', `Expense ₹${amount} recorded under ${category}.`, project_id);
+    res.json({ id: result.lastID, project_id, description, category, amount, date, payment_method, status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/expenses/:id', async (req, res) => {
+  try {
+    await execute(`DELETE FROM expenses WHERE id=?`, [req.params.id]);
+    res.json({ success: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==================== DASHBOARD STATS ====================
-app.get('/api/stats', (req, res) => {
-  db.all(`
-    SELECT
-      (SELECT COUNT(*) FROM projects) as total_projects,
-      (SELECT COUNT(*) FROM projects WHERE status='completed') as completed_projects,
-      (SELECT COUNT(*) FROM projects WHERE status='running') as running_projects,
-      (SELECT COUNT(*) FROM projects WHERE status='delayed') as delayed_projects,
-      (SELECT COUNT(*) FROM clients) as total_clients,
-      (SELECT COALESCE(SUM(budget), 0) FROM projects) as total_budget,
-      (SELECT COALESCE(SUM(spent), 0) FROM projects) as total_spent,
-      (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE category='material') as material_cost,
-      (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE category='labour') as labour_cost,
-      (SELECT COALESCE(SUM(amount), 0) FROM expenses) as total_expenses
-  `, (err, rows) => {
-    if (err) res.status(500).json({ error: err.message });
-    else {
-      const stats = rows[0] || {};
-      stats.profit = (stats.total_budget || 0) - (stats.total_expenses || 0);
-      res.json(stats);
-    }
-  });
+app.get('/api/stats', async (req, res) => {
+  try {
+    const totalProj = await query(`SELECT COUNT(*) as cnt FROM projects`);
+    const compProj = await query(`SELECT COUNT(*) as cnt FROM projects WHERE status='completed'`);
+    const runProj = await query(`SELECT COUNT(*) as cnt FROM projects WHERE status='running'`);
+    const upProj = await query(`SELECT COUNT(*) as cnt FROM projects WHERE status='upcoming'`);
+    const delProj = await query(`SELECT COUNT(*) as cnt FROM projects WHERE status='delayed'`);
+    const totClients = await query(`SELECT COUNT(*) as cnt FROM clients`);
+    const totBudget = await query(`SELECT COALESCE(SUM(budget), 0) as sum FROM projects`);
+    const totSpent = await query(`SELECT COALESCE(SUM(spent), 0) as sum FROM projects`);
+    const matCost = await query(`SELECT COALESCE(SUM(amount), 0) as sum FROM expenses WHERE LOWER(category)='material'`);
+    const labCost = await query(`SELECT COALESCE(SUM(amount), 0) as sum FROM expenses WHERE LOWER(category)='labour'`);
+    const totExp = await query(`SELECT COALESCE(SUM(amount), 0) as sum FROM expenses`);
+    const rev = await query(`SELECT COALESCE(SUM(amount), 0) as sum FROM invoices WHERE status='paid'`);
+
+    const stats = {
+      total_projects: Number(totalProj[0]?.cnt || 0),
+      completed_projects: Number(compProj[0]?.cnt || 0),
+      running_projects: Number(runProj[0]?.cnt || 0),
+      upcoming_projects: Number(upProj[0]?.cnt || 0),
+      delayed_projects: Number(delProj[0]?.cnt || 0),
+      total_clients: Number(totClients[0]?.cnt || 0),
+      total_budget: Number(totBudget[0]?.sum || 0),
+      total_spent: Number(totSpent[0]?.sum || 0),
+      material_cost: Number(matCost[0]?.sum || 0),
+      labour_cost: Number(labCost[0]?.sum || 0),
+      total_expenses: Number(totExp[0]?.sum || 0),
+      monthly_revenue: Number(rev[0]?.sum || 0),
+    };
+    stats.profit = (stats.monthly_revenue || stats.total_budget) - stats.total_expenses;
+
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== ACTIVITY LOG ====================
+app.get('/api/activities', async (req, res) => {
+  try {
+    const rows = await query(`SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 20`);
+    res.json(rows || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==================== EXCEL EXPORT ====================
-app.get('/api/export/excel', (req, res) => {
-  db.all(`SELECT * FROM projects`, (err, projects) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-
+app.get('/api/export/excel', async (req, res) => {
+  try {
+    const projects = await query(`SELECT * FROM projects`);
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Projects');
@@ -264,9 +639,9 @@ app.get('/api/export/excel', (req, res) => {
       { header: 'Project Name', key: 'name', width: 30 },
       { header: 'Client', key: 'client_name', width: 20 },
       { header: 'Status', key: 'status', width: 15 },
-      { header: 'Progress', key: 'progress', width: 10 },
-      { header: 'Budget', key: 'budget', width: 15 },
-      { header: 'Spent', key: 'spent', width: 15 },
+      { header: 'Progress (%)', key: 'progress', width: 15 },
+      { header: 'Budget (₹)', key: 'budget', width: 15 },
+      { header: 'Spent (₹)', key: 'spent', width: 15 },
       { header: 'Start Date', key: 'start_date', width: 15 },
     ];
 
@@ -277,34 +652,62 @@ app.get('/api/export/excel', (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=buildflow-projects.xlsx');
 
-    workbook.xlsx.write(res).then(() => {
-      res.end();
-    });
-  });
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: '✅ Server running', port: PORT });
+  res.json({
+    status: '✅ Server running',
+    port: PORT,
+    database: usePg ? 'Neon Cloud PostgreSQL Database ⚡' : 'Local SQLite 📦',
+    env: process.env.NODE_ENV || 'development'
+  });
 });
+
+// ==================== JS VIEW ROUTES (Formerly PHP Pages) ====================
+app.get('/view/dashboard', renderDashboard);
+app.get('/view/projects', renderProjects);
+app.get('/view/projects/detail', renderProjectView);
+app.get('/view/projects/delete-material', handleDeleteMaterial);
+app.get('/view/clients', renderClients);
+app.get('/view/materials', renderMaterials);
+app.get('/view/finance', renderFinance);
+app.get('/view/estimation', renderEstimation);
+app.get('/view/calendar', renderCalendar);
+app.get('/view/reports', renderReports);
+app.get('/view/settings', renderSettings);
+app.get('/view/documents', renderDocuments);
+app.get('/view/login', handleLogin);
+app.post('/view/login', handleLogin);
+app.get('/view/logout', handleLogout);
 
 // Start server
 app.listen(PORT, () => {
   console.log(`\n🚀 BuildFlow Backend Server Running!`);
   console.log(`📍 URL: http://localhost:${PORT}`);
-  console.log(`📦 Database: ${dbPath}`);
+  console.log(`📦 Database: ${usePg ? '⚡ Neon Cloud PostgreSQL' : 'Local SQLite'}`);
   console.log(`\n✅ API Endpoints Ready:`);
+  console.log(`   POST /api/auth/login     - Authenticate user`);
+  console.log(`   POST /api/auth/register  - Register user`);
+  console.log(`   GET  /api/auth/me        - Get current user`);
   console.log(`   GET  /api/projects       - List all projects`);
   console.log(`   POST /api/projects       - Create project`);
   console.log(`   GET  /api/clients        - List clients`);
   console.log(`   POST /api/clients        - Create client`);
   console.log(`   GET  /api/materials      - List materials`);
+  console.log(`   POST /api/materials      - Add material`);
   console.log(`   GET  /api/expenses       - List expenses`);
-  console.log(`   GET  /api/stats          - Dashboard stats`);
-  console.log(`   GET  /api/export/excel   - Export to Excel\n`);
+  console.log(`   POST /api/expenses       - Add expense`);
+  console.log(`   GET  /api/stats          - Dashboard stats\n`);
 });
 
 process.on('SIGINT', () => {
-  db.close();
+  if (sqliteDb) sqliteDb.close();
+  if (pgPool) pgPool.end();
   process.exit(0);
 });

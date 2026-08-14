@@ -17,9 +17,9 @@ interface Filters {
 export default function ReportMaterials({ filters }: { filters: Filters }) {
   const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null)
 
-  const materials = []
+  const materials: any[] = []
 
-  const workStages = []
+  const workStages: any[] = []
 
   return (
     <motion.div

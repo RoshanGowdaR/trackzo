@@ -5,7 +5,7 @@ import DashboardLayout from '@/layouts/DashboardLayout'
 import { motion } from 'framer-motion'
 import { Plus, FileText } from 'lucide-react'
 
-const estimations = []
+const estimations: any[] = []
 
 export default function EstimationPage() {
   const [selectedProject, setSelectedProject] = useState('all')

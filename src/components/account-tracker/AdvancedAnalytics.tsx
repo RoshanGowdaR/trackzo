@@ -2,13 +2,8 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
+import SafeChart from '@/components/SafeChart'
 import { BarChart3, TrendingUp, PieChart, LineChart } from 'lucide-react'
-
-const Chart = dynamic(() => import('react-apexcharts'), {
-  ssr: false,
-  loading: () => <div className="h-80 bg-secondary-800/30 rounded-2xl animate-pulse" />,
-})
 
 interface AdvancedAnalyticsProps {
   data: {
@@ -145,7 +140,7 @@ export default function AdvancedAnalytics({ data, period = 'monthly' }: Advanced
           className="bg-gradient-to-br from-secondary-800/50 via-secondary-900/50 to-secondary-900/30 border border-white/5 rounded-2xl p-6 backdrop-blur-xl"
         >
           <h3 className="text-lg font-bold text-white mb-6">Budget Utilization</h3>
-          <Chart
+          <SafeChart
             options={budgetChartOptions}
             series={budgetChartSeries}
             type="radialBar"
@@ -159,7 +154,7 @@ export default function AdvancedAnalytics({ data, period = 'monthly' }: Advanced
           className="bg-gradient-to-br from-secondary-800/50 via-secondary-900/50 to-secondary-900/30 border border-white/5 rounded-2xl p-6 backdrop-blur-xl"
         >
           <h3 className="text-lg font-bold text-white mb-6">Expense Breakdown</h3>
-          <Chart
+          <SafeChart
             options={costBreakdownOptions}
             series={costBreakdownSeries}
             type="donut"
@@ -174,7 +169,7 @@ export default function AdvancedAnalytics({ data, period = 'monthly' }: Advanced
         className="bg-gradient-to-br from-secondary-800/50 via-secondary-900/50 to-secondary-900/30 border border-white/5 rounded-2xl p-6 backdrop-blur-xl"
       >
         <h3 className="text-lg font-bold text-white mb-6">Spending Trend</h3>
-        <Chart
+        <SafeChart
           options={monthlyTrendOptions}
           series={monthlyTrendSeries}
           type="area"
