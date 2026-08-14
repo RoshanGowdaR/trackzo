@@ -14,30 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware
-const { sessionConfig } = require('./php-version/config/session');
-app.use(sessionConfig);
 
-// JS View Controllers (replaces former PHP files)
-const { renderDashboard } = require('./php-version/index');
-const { handleLogin } = require('./php-version/login');
-const { handleLogout } = require('./php-version/logout');
-const { renderProjects } = require('./php-version/projects/index');
-const { renderProjectView } = require('./php-version/projects/view');
-const { handleDeleteMaterial } = require('./php-version/projects/delete-material');
-const { renderClients } = require('./php-version/clients/index');
-const { renderMaterials } = require('./php-version/materials/index');
-const { renderFinance } = require('./php-version/finance/index');
-const { renderEstimation } = require('./php-version/estimation/index');
-const { renderCalendar } = require('./php-version/calendar/index');
-const { renderReports } = require('./php-version/reports/index');
-const { renderSettings } = require('./php-version/settings/index');
-const { renderDocuments } = require('./php-version/documents/index');
-
-// Serve static assets if present
-if (fs.existsSync(path.join(__dirname, 'php-version', 'assets'))) {
-  app.use('/assets', express.static(path.join(__dirname, 'php-version', 'assets')));
-}
 
 // ==================== DATABASE SETUP ====================
 const usePg = !!process.env.DATABASE_URL;
@@ -669,22 +646,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ==================== JS VIEW ROUTES (Formerly PHP Pages) ====================
-app.get('/view/dashboard', renderDashboard);
-app.get('/view/projects', renderProjects);
-app.get('/view/projects/detail', renderProjectView);
-app.get('/view/projects/delete-material', handleDeleteMaterial);
-app.get('/view/clients', renderClients);
-app.get('/view/materials', renderMaterials);
-app.get('/view/finance', renderFinance);
-app.get('/view/estimation', renderEstimation);
-app.get('/view/calendar', renderCalendar);
-app.get('/view/reports', renderReports);
-app.get('/view/settings', renderSettings);
-app.get('/view/documents', renderDocuments);
-app.get('/view/login', handleLogin);
-app.post('/view/login', handleLogin);
-app.get('/view/logout', handleLogout);
 
 // Start server
 app.listen(PORT, () => {

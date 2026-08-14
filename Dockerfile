@@ -27,7 +27,6 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/server.js ./
-COPY --from=builder /app/php-version ./php-version
 COPY --from=builder /app/start.js ./
 
 EXPOSE 10000
